@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 # from torch import device
+import math
 import tqdm
 import numpy as np
 # import CuPy as cp
@@ -70,6 +71,12 @@ class MultiHeadAttention(nn.Module):
         soft_score = F.softmax(score, dim=-1)
         out = torch.matmul(soft_score, value).transpose(1, 2).contiguous().view(self.batch_size, -1,
                                                                                 self.heads * self.key_dim)
+        
+        maximum_value = torch.max(out)#torch.FloatTensor([math.sqrt(torch.max(value))]).to(args.device)
+        if maximum_value > 1.0:
+            maximum_value = torch.FloatTensor([math.sqrt(torch.max(out))]).to(device)
+            out.divide_(maximum_value)
+            
         out = self.concat(out)
         return out
 
@@ -238,7 +245,15 @@ class TransformerBlock(nn.Module):
         """
         output = inputs + self.attention(inputs)
         output = self.layer_norm1(output)
-        output = output + self.ffnn(output)
+        #output = output + self.ffnn(output)
+        ffn_output = self.ffnn(output)
+        
+        maximum_value = torch.max(ffn_output)#torch.FloatTensor([math.sqrt(torch.max(value))]).to(args.device)
+        if maximum_value > 1.0:
+            maximum_value = torch.FloatTensor([math.sqrt(torch.max(ffn_output))]).to(device)
+            ffn_output.divide_(maximum_value)
+        
+        output = output + ffn_output
         output = self.layer_norm2(output)
 
         return output
